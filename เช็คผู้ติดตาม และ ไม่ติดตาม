@@ -109,9 +109,7 @@ const getUserFriendshipStats = async (username) => {
   };
 };
 
-// --- แก้ไขชื่อผู้ใช้ตรงนี้ ---
 username = "ใส่ชื่อตรงนี้"; 
-// -----------------------
 
 getUserFriendshipStats(username).then((results) => {
   console.log("--- สรุปผลการตรวจสอบ ---");
