@@ -1,0 +1,120 @@
+if (window.location.origin !== "https://www.instagram.com") {
+  window.alert(
+    "เฮ้! คุณต้องอยู่ที่หน้าเว็บ Instagram ก่อนถึงจะรันโค้ดนี้ได้ เดี๋ยวผมจะพาคุณไปที่นั่น แต่คุณต้องวางโค้ดใน console อีกรอบนะ",
+  );
+  window.location.href = "https://www.instagram.com";
+  console.clear();
+}
+
+const fetchOptions = {
+  credentials: "include",
+  headers: {
+    "X-IG-App-ID": "936619743392459",
+  },
+  method: "GET",
+};
+
+let username;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const random = (min, max) => Math.floor(Math.random() * (max - min)) + min;
+
+const concatFriendshipsApiResponse = async (
+  list,
+  user_id,
+  count,
+  next_max_id = "",
+) => {
+  let url = `https://www.instagram.com/api/v1/friendships/${user_id}/${list}/?count=${count}`;
+  if (next_max_id) {
+    url += `&max_id=${next_max_id}`;
+  }
+  const data = await fetch(url, fetchOptions).then((r) => r.json());
+  if (data.next_max_id) {
+    const timeToSleep = random(800, 1500);
+    console.log(
+      `โหลดรายชื่อ ${list} ได้ ${data.users.length} คนแล้ว... กำลังรอ ${timeToSleep}ms เพื่อป้องกันการโดนบล็อก`,
+    );
+    await sleep(timeToSleep);
+    return data.users.concat(
+      await concatFriendshipsApiResponse(
+        list,
+        user_id,
+        count,
+        data.next_max_id,
+      ),
+    );
+  }
+  return data.users;
+};
+
+const getFollowers = (user_id, count = 50, next_max_id = "") => {
+  return concatFriendshipsApiResponse("followers", user_id, count, next_max_id);
+};
+
+const getFollowing = (user_id, count = 50, next_max_id = "") => {
+  return concatFriendshipsApiResponse("following", user_id, count, next_max_id);
+};
+
+const getUserId = async (username) => {
+  let user = username;
+  const lower = user.toLowerCase();
+  const url = `https://www.instagram.com/api/v1/web/search/topsearch/?context=blended&query=${lower}&include_reel=false`;
+  const data = await fetch(url, fetchOptions).then((r) => r.json());
+  const result = data.users?.find(
+    (result) => result.user.username.toLowerCase() === lower,
+  );
+  return result?.user?.pk || null;
+};
+
+const getUserFriendshipStats = async (username) => {
+  console.log("--- เริ่มต้นการตรวจสอบ โปรดรอสักครู่ ---");
+  const user_id = await getUserId(username);
+  if (!user_id) {
+    throw new Error(`ไม่พบชื่อผู้ใช้: ${username}`);
+  }
+
+  const followers = await getFollowers(user_id);
+  const following = await getFollowing(user_id);
+
+  const followersUsernames = followers.map((follower) =>
+    follower.username.toLowerCase(),
+  );
+  const followingUsernames = following.map((followed) =>
+    followed.username.toLowerCase(),
+  );
+
+  const followerSet = new Set(followersUsernames);
+  const followingSet = new Set(followingUsernames);
+
+  console.log(Array(28).fill("-").join(""));
+  console.log(
+    `ดึงข้อมูลสำเร็จ!`,
+    `ผู้ติดตาม (Followers): ${followerSet.size} คน | `,
+    `กำลังติดตาม (Following): ${followingSet.size} คน`,
+  );
+  console.log(
+    `หากตัวเลขไม่ตรงกับหน้าโปรไฟล์ ผลลัพธ์ด้านล่างอาจคลาดเคลื่อนเล็กน้อย`,
+  );
+
+  const คนที่เราไม่ได้ติดตามกลับ = Array.from(followerSet).filter(
+    (follower) => !followingSet.has(follower),
+  );
+  const คนที่ไม่ติดตามเรากลับ = Array.from(followingSet).filter(
+    (following) => !followerSet.has(following),
+  );
+
+  return {
+    "รายชื่อคนที่เราไม่ได้ติดตามกลับ": คนที่เราไม่ได้ติดตามกลับ,
+    "รายชื่อคนที่ไม่ติดตามเรากลับ": คนที่ไม่ติดตามเรากลับ,
+  };
+};
+
+// --- แก้ไขชื่อผู้ใช้ตรงนี้ ---
+username = "ใส่ชื่อตรงนี้"; 
+// -----------------------
+
+getUserFriendshipStats(username).then((results) => {
+  console.log("--- สรุปผลการตรวจสอบ ---");
+  console.log(results);
+  console.log(`พบคนที่ไม่ติดตามคุณกลับทั้งหมด: ${results["รายชื่อคนที่ไม่ติดตามเรากลับ"].length} คน`);
+});
